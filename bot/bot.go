@@ -11,6 +11,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+const CHRIS_ID = "245751144209448961"     // Chris's ID
+var crissyMode = false                    // Crissy mode flag
 var BotToken string                       // Token for the bot, set in main.go
 var punsihedUsers = make(map[string]bool) // map to keep track of punished users
 var (
@@ -41,6 +43,10 @@ var (
 				},
 			},
 		},
+		{
+			Name:        "crissy",
+			Description: "Toggle Crissy mode",
+		},
 	}
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"punish": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -49,6 +55,7 @@ var (
 			if err != nil {
 				log.Fatal(err)
 			}
+
 			content := ""
 			switch punsihedUsers[userID] {
 			case true:
@@ -110,6 +117,43 @@ var (
 			//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("Absolving user %s", member.Mention()))
 			//delete(punsihedUsers, userID)
 		},
+		"crissy": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			if i.GuildID == "698693159261306921" {
+				member, err := s.GuildMember(i.GuildID, CHRIS_ID)
+				if err != nil {
+					log.Fatal(err)
+				}
+				crissyContent := ""
+				switch crissyMode {
+				case true:
+					crissyContent = fmt.Sprintf("%s is now less of a sinner💦", member.Mention())
+					crissyMode = false
+
+				case false:
+					crissyContent = fmt.Sprintf("%s will now get timed out for 1 minute if he @'s💦", member.Mention())
+					crissyMode = false
+				}
+				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: crissyContent,
+					},
+				})
+			} else {
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: "You are not allowed to use this command in this server",
+					},
+				})
+				if err != nil {
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
+				}
+			}
+		},
 	}
 )
 
@@ -137,6 +181,7 @@ func Run() {
 	if err != nil {
 		log.Fatalf("Cannot open the session: %v", err)
 	}
+	discord.UpdateCustomStatus("Daddy I'm Coming!")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
 		cmd, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", v)
@@ -181,10 +226,26 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if message.Author.ID == discord.State.User.ID {
 		return
 	}
+
 	member, err := discord.GuildMember(message.GuildID, message.Author.ID)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if crissyMode {
+		if message.Author.ID == CHRIS_ID && len(message.Mentions) == 0 {
+			currentTime := time.Now()
+			oneMinute := currentTime.Add(time.Minute * 1)
+			// if the message is from Chris, then punish him for 1 minute
+			err = discord.GuildMemberTimeout(message.GuildID, message.Author.ID, &oneMinute)
+			if err != nil {
+				log.Fatal(err)
+			}
+			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s has been punished for 1 minute", member.Mention()))
+
+		}
+	}
+
 	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case punsihedUsers[message.Author.ID]:
