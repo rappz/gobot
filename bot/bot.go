@@ -244,7 +244,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s has been punished for 1 minute", member.Mention()))
+			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
 
 		}
 	}
@@ -252,7 +252,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case punsihedUsers[message.Author.ID]:
-		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s \nYou are punished!😡", member.Mention()))
+		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s \nYou are punished!😡\n Bad kitten!🤪", member.Mention()))
 		checkNilErr(err)
 		discord.ChannelMessageDelete(message.ChannelID, message.ID) // delete the message
 		time.Sleep(5 * time.Second)                                 // wait for 5 seconds
