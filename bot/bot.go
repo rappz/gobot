@@ -142,6 +142,10 @@ var (
 				if err != nil {
 					log.Fatal(err)
 				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
 			} else {
 				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
@@ -155,6 +159,10 @@ var (
 					})
 					return
 				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
 			}
 		},
 	}
