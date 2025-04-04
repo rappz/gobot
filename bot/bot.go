@@ -17,8 +17,8 @@ var BotToken string                       // Token for the bot, set in main.go
 var punsihedUsers = make(map[string]bool) // map to keep track of punished users
 var (
 	RemoveCommands = flag.Bool("rm-cmd", false, "Remove commands after execution")
-	dmPermission   = false
-	commands       = []*discordgo.ApplicationCommand{
+	//dmPermission   = false
+	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:        "punish",
 			Description: "Punish a bad kitten",
@@ -131,7 +131,7 @@ var (
 
 				case false:
 					crissyContent = fmt.Sprintf("%s will now get timed out for 1 minute if he @'s💦", member.Mention())
-					crissyMode = false
+					crissyMode = true
 				}
 				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
@@ -139,6 +139,9 @@ var (
 						Content: crissyContent,
 					},
 				})
+				if err != nil {
+					log.Fatal(err)
+				}
 			} else {
 				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
