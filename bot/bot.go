@@ -55,7 +55,18 @@ var (
 			if err != nil {
 				log.Fatal(err)
 			}
-
+			if member.User.Bot {
+				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: fmt.Sprintf("Only god can punish %s", member.Mention()),
+					},
+				})
+				if err != nil {
+					log.Fatal(err)
+				}
+				return
+			}
 			content := ""
 			switch punsihedUsers[userID] {
 			case true:
@@ -88,6 +99,19 @@ var (
 			member, err := s.GuildMember(i.GuildID, userID)
 			if err != nil {
 				log.Fatal(err)
+			}
+
+			if member.User.Bot {
+				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: fmt.Sprintf("Only god can absolve %s", member.Mention()),
+					},
+				})
+				if err != nil {
+					log.Fatal(err)
+				}
+				return
 			}
 			content := ""
 			switch punsihedUsers[userID] {
@@ -238,6 +262,9 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		return
 	}
 
+	if message.Author.Bot {
+		return
+	}
 	member, err := discord.GuildMember(message.GuildID, message.Author.ID)
 	if err != nil {
 		log.Fatal(err)
