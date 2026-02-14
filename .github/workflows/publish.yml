@@ -3,7 +3,7 @@ name: publish
 on: [push]
 
 jobs:
-  publish-hello-docker-image:
+  publish-chrisbot-docker-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -15,8 +15,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build the hello-docker Docker image
+      - name: Build the chrisbot Docker image
         run: |
-          docker build . --tag ghcr.io/deselikem/hello-docker-gcr-demo:latest
-          docker run ghcr.io/deselikem/hello-docker-gcr-demo:latest
-          docker push ghcr.io/deselikem/hello-docker-gcr-demo:latest
+          docker build . --tag ghcr.io/rappz/golang-bot:latest
+          docker run ghcr.io/rappz/golang-bot:latest
+          docker push ghcr.io/rappz/golang-bot:latest
