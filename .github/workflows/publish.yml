@@ -5,6 +5,9 @@ on: [push]
 jobs:
   publish-chrisbot-docker-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v2
 
@@ -17,6 +20,5 @@ jobs:
 
       - name: Build the chrisbot Docker image
         run: |
-          docker build . --tag ghcr.io/rappz/golang-bot:latest
-          docker run ghcr.io/rappz/golang-bot:latest
-          docker push ghcr.io/rappz/golang-bot:latest
+          docker build . --tag ghcr.io/${{ github.repository_owner }}/gobot:latest
+          docker push ghcr.io/${{ github.repository_owner }}/gobot:latest
