@@ -53,7 +53,8 @@ var (
 			userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
 			member, err := s.GuildMember(i.GuildID, userID)
 			if err != nil {
-				log.Fatal(err)
+				log.Print(err)
+				return
 			}
 			if member.User.Bot {
 				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -63,7 +64,8 @@ var (
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
+					return
 				}
 				return
 			}
@@ -98,7 +100,8 @@ var (
 			userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
 			member, err := s.GuildMember(i.GuildID, userID)
 			if err != nil {
-				log.Fatal(err)
+				log.Print(err)
+				return
 			}
 
 			if member.User.Bot {
@@ -109,7 +112,8 @@ var (
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
+					return
 				}
 				return
 			}
@@ -145,7 +149,8 @@ var (
 			if i.GuildID == "698693159261306921" {
 				member, err := s.GuildMember(i.GuildID, CHRIS_ID)
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
+					return
 				}
 				crissyContent := ""
 				switch crissyMode {
@@ -164,7 +169,8 @@ var (
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
+					return
 				}
 				time.AfterFunc(time.Second*5, func() {
 					// delete the message after 5 seconds
@@ -194,7 +200,7 @@ var (
 
 func checkNilErr(e error) {
 	if e != nil {
-		log.Fatal("Error message")
+		log.Print("Error: ", e)
 	}
 }
 
@@ -214,14 +220,16 @@ func Run() {
 	// open session
 	err = discord.Open()
 	if err != nil {
-		log.Fatalf("Cannot open the session: %v", err)
+		log.Printf("Cannot open the session: %v", err)
+		return
 	}
 	discord.UpdateCustomStatus("Daddy I'm Coming!")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
 		cmd, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", v)
 		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+			log.Printf("Cannot create '%v' command: %v", v.Name, err)
+			continue
 		}
 		registeredCommands[i] = cmd
 	}
@@ -245,9 +253,12 @@ func Run() {
 		// }
 
 		for _, v := range registeredCommands {
+			if v == nil {
+				continue
+			}
 			err := discord.ApplicationCommandDelete(discord.State.User.ID, "", v.ID)
 			if err != nil {
-				log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+				log.Printf("Cannot delete '%v' command: %v", v.Name, err)
 			}
 		}
 	}
@@ -267,7 +278,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 	member, err := discord.GuildMember(message.GuildID, message.Author.ID)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return
 	}
 
 	if crissyMode {
@@ -277,7 +289,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			// if the message is from Chris, then punish him for 1 minute
 			err = discord.GuildMemberTimeout(message.GuildID, message.Author.ID, &oneMinute)
 			if err != nil {
-				log.Fatal(err)
+				log.Print(err)
+				return
 			}
 			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
 
