@@ -1,6 +1,6 @@
 # Chrisbot
 
-A Discord bot built for a friends' server. It’s built to **punish Chris** in particular, but anyone can be punished or absolved.
+A Discord bot built for Ratlantis. It's build to **Punish Chris** in particular, but anyone can be punished or absolved.
 
 ## Features
 
@@ -54,7 +54,7 @@ docker run -e TOKEN=your_bot_token_here gobot
 |----------|-------------------------------------|
 | `/punish @user` | Punish a user (bad kitten).        |
 | `/absolve @user` | Absolve a user (forgive the kitten). |
-| `/crissy` | Toggle Crissy mode (Chris timeout rule). |
+| `/crissy` | Toggle Crissy mode (Chris timeout rule, times out Chris for 1 minute). |
 
 ---
 
