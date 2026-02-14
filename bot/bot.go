@@ -283,7 +283,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 
 	if crissyMode {
-		if message.Author.ID == CHRIS_ID && len(message.Mentions) == 0 {
+		if message.Author.ID == CHRIS_ID && len(message.Mentions) != 0 {
 			currentTime := time.Now()
 			oneMinute := currentTime.Add(time.Minute * 1)
 			// if the message is from Chris, then punish him for 1 minute
