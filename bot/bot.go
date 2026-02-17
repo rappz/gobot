@@ -21,28 +21,28 @@ var PUNISH_MESSAGES = []string{
 	"%sYou are punished!😡\n Bad kitten!🤪",
 	"%s Daddy is mad now 😤\nNaughty little kitten 🐾",
 	"%s Uh-oh… daddy saw that 🙃\nBad baby cat 🐱💢",
-	"%s Love muffin misbehaved again 🧁\nDaddy’s disappointed 😑",
+	"%s Love muffin misbehaved again 🧁\nDaddy's disappointed 😑",
 	"%s Tiny rat energy detected 🐀⚡\nDaddy is not amused 😠",
 	"%s Who scratched the couch?? 😡\nWas it my chaotic kitten? 🐈‍⬛",
 	"%s No treats for spicy kitty 😼🚫\nDaddy says behave.",
 	"%s You hiss at daddy?? 😾\nBold move, little gremlin.",
-	"%s That’s it. Jail for kitten. 🚔🐱\nDaddy is furious.",
+	"%s That's it. Jail for kitten. 🚔🐱\nDaddy is furious.",
 	"%s You adorable menace 😤💘\nWhy is daddy always stressed.",
 	"%s Rat behavior. Absolute rat behavior. 🐀\nDaddy is shaking his head.",
 	"%s Love muffin turned into chaos muffin 🧁🔥\nDaddy needs a minute.",
 	"%s Tiny paws, big crimes 🐾\nDaddy witnessed everything 👀",
-	"%s Don’t blink at me like that 😒\nYou know daddy is mad.",
+	"%s Don't blink at me like that 😒\nYou know daddy is mad.",
 	"%s Sweet baby kitten by day 😇\nCertified rat by night 🐀🌙",
 	"%s Who knocked over the water?? 💦\nConfess, fuzzy criminal.",
 	"%s Daddy gave you one job 😐\nYou chose violence, kitten.",
-	"%s Stop being cute while guilty 😤💕\nIt’s manipulative.",
-	"%s You bit daddy?? 😡\nThat’s betrayal, little fang gremlin 🐱🩸",
+	"%s Stop being cute while guilty 😤💕\nIt's manipulative.",
+	"%s You bit daddy?? 😡\nThat's betrayal, little fang gremlin 🐱🩸",
 	"%s Suspicious whiskers detected 🕵️‍♂️\nDaddy knows.",
 	"%s Love muffin revoked. Now just muffin. 😑🧁",
 	"%s Tiny toe beans, massive audacity 🐾\nDaddy is stunned.",
 	"%s Why are you staring like that 👁️\nYou absolutely did something.",
 	"%s Menace in a fur coat 😼\nDaddy demands order.",
-	"%s One more zoomie and it’s over 😤💨\nDaddy said calm.",
+	"%s One more zoomie and it's over 😤💨\nDaddy said calm.",
 	"%s Come here, you chaotic rat kitten 🐀🐱\nDaddy is mad… but also holding you anyway.",
 }
 var (
@@ -119,6 +119,7 @@ var (
 					},
 				})
 				if err != nil {
+					log.Printf("Error responding to interaction: %v", err)
 					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 						Content: "Something went wrong",
 					})
@@ -153,8 +154,8 @@ var (
 				member, err := s.GuildMember(i.GuildID, userID)
 				if err != nil {
 					log.Printf("Error getting guild member: %v", err)
+					return
 				}
-
 				if member.User.Bot {
 					err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 						Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
@@ -183,6 +184,7 @@ var (
 					},
 				})
 				if err != nil {
+					log.Printf("Error responding to interaction: %v", err)
 					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 						Content: "Something went wrong",
 					})
@@ -216,6 +218,7 @@ var (
 				member, err := s.GuildMember(i.GuildID, CHRIS_ID)
 				if err != nil {
 					log.Printf("Error getting guild member: %v", err)
+					return
 				}
 				crissyContent := ""
 				switch crissyMode {
@@ -235,6 +238,7 @@ var (
 				})
 				if err != nil {
 					log.Printf("Error responding to interaction: %v", err)
+					return
 				}
 				time.AfterFunc(time.Second*5, func() {
 					// delete the message after 5 seconds
@@ -267,7 +271,7 @@ func getRandomPunishMessage() string {
 }
 func checkNilErr(e error) {
 	if e != nil {
-		log.Printf("Error:", e)
+		log.Print("Error: ", e)
 	}
 }
 
@@ -287,14 +291,16 @@ func Run() {
 	// open session
 	err = discord.Open()
 	if err != nil {
-		log.Fatalf("Cannot open the session: %v", err)
+		log.Printf("Cannot open the session: %v", err)
+		return
 	}
 	discord.UpdateCustomStatus("Daddy I'm Coming!")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
 		cmd, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", v)
 		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+			log.Printf("Cannot create '%v' command: %v", v.Name, err)
+			continue
 		}
 		registeredCommands[i] = cmd
 	}
@@ -310,9 +316,12 @@ func Run() {
 		log.Println("Removing commands...")
 
 		for _, v := range registeredCommands {
+			if v == nil {
+				continue
+			}
 			err := discord.ApplicationCommandDelete(discord.State.User.ID, "", v.ID)
 			if err != nil {
-				log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+				log.Printf("Cannot delete '%v' command: %v", v.Name, err)
 			}
 		}
 	}
@@ -343,13 +352,14 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 
 	if crissyMode {
-		if message.Author.ID == CHRIS_ID && len(message.Mentions) == 0 {
+		if message.Author.ID == CHRIS_ID && len(message.Mentions) != 0 {
 			currentTime := time.Now()
 			oneMinute := currentTime.Add(time.Minute * 1)
 			// if the message is from Chris, then punish him for 1 minute
 			err = discord.GuildMemberTimeout(message.GuildID, message.Author.ID, &oneMinute)
 			if err != nil {
 				log.Printf("Error setting timeout: %v", err)
+				return
 			}
 			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
 		}
