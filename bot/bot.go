@@ -297,7 +297,6 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 	}
 
-	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case punsihedUsers[message.Author.ID]:
 		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s \nYou are punished!😡\n Bad kitten!🤪", member.Mention()))
