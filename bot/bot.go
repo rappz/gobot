@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"time"
@@ -15,13 +16,43 @@ const CHRIS_ID = "245751144209448961"     // Chris's ID
 var crissyMode = false                    // Crissy mode flag
 var BotToken string                       // Token for the bot, set in main.go
 var punsihedUsers = make(map[string]bool) // map to keep track of punished users
+var defaultMemberPermissions = int64(discordgo.PermissionAdministrator)
+var PUNISH_MESSAGES = []string{
+	"%sYou are punished!😡\n Bad kitten!🤪",
+	"%s Daddy is mad now 😤\nNaughty little kitten 🐾",
+	"%s Uh-oh… daddy saw that 🙃\nBad baby cat 🐱💢",
+	"%s Love muffin misbehaved again 🧁\nDaddy’s disappointed 😑",
+	"%s Tiny rat energy detected 🐀⚡\nDaddy is not amused 😠",
+	"%s Who scratched the couch?? 😡\nWas it my chaotic kitten? 🐈‍⬛",
+	"%s No treats for spicy kitty 😼🚫\nDaddy says behave.",
+	"%s You hiss at daddy?? 😾\nBold move, little gremlin.",
+	"%s That’s it. Jail for kitten. 🚔🐱\nDaddy is furious.",
+	"%s You adorable menace 😤💘\nWhy is daddy always stressed.",
+	"%s Rat behavior. Absolute rat behavior. 🐀\nDaddy is shaking his head.",
+	"%s Love muffin turned into chaos muffin 🧁🔥\nDaddy needs a minute.",
+	"%s Tiny paws, big crimes 🐾\nDaddy witnessed everything 👀",
+	"%s Don’t blink at me like that 😒\nYou know daddy is mad.",
+	"%s Sweet baby kitten by day 😇\nCertified rat by night 🐀🌙",
+	"%s Who knocked over the water?? 💦\nConfess, fuzzy criminal.",
+	"%s Daddy gave you one job 😐\nYou chose violence, kitten.",
+	"%s Stop being cute while guilty 😤💕\nIt’s manipulative.",
+	"%s You bit daddy?? 😡\nThat’s betrayal, little fang gremlin 🐱🩸",
+	"%s Suspicious whiskers detected 🕵️‍♂️\nDaddy knows.",
+	"%s Love muffin revoked. Now just muffin. 😑🧁",
+	"%s Tiny toe beans, massive audacity 🐾\nDaddy is stunned.",
+	"%s Why are you staring like that 👁️\nYou absolutely did something.",
+	"%s Menace in a fur coat 😼\nDaddy demands order.",
+	"%s One more zoomie and it’s over 😤💨\nDaddy said calm.",
+	"%s Come here, you chaotic rat kitten 🐀🐱\nDaddy is mad… but also holding you anyway.",
+}
 var (
 	RemoveCommands = flag.Bool("rm-cmd", false, "Remove commands after execution")
 	//dmPermission   = false
 	commands = []*discordgo.ApplicationCommand{
 		{
-			Name:        "punish",
-			Description: "Punish a bad kitten",
+			Name:                     "punish",
+			Description:              "Punish a bad kitten",
+			DefaultMemberPermissions: &defaultMemberPermissions,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
@@ -32,8 +63,9 @@ var (
 			},
 		},
 		{
-			Name:        "absolve",
-			Description: "Absolve a kitten of sin",
+			Name:                     "absolve",
+			Description:              "Absolve a kitten of sin",
+			DefaultMemberPermissions: &defaultMemberPermissions,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
@@ -44,108 +76,146 @@ var (
 			},
 		},
 		{
-			Name:        "crissy",
-			Description: "Toggle Crissy mode",
+			Name:                     "crissy",
+			Description:              "Toggle Crissy mode",
+			DefaultMemberPermissions: &defaultMemberPermissions,
 		},
 	}
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"punish": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
-			member, err := s.GuildMember(i.GuildID, userID)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if member.User.Bot {
+			if i.GuildID == "698693159261306921" {
+				userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
+				member, err := s.GuildMember(i.GuildID, userID)
+				if err != nil {
+					log.Printf("Error getting guild member: %v", err)
+					return
+				}
+				if member.User.Bot {
+					err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+						Data: &discordgo.InteractionResponseData{
+							Content: fmt.Sprintf("Only god can punish %s", member.Mention()),
+						},
+					})
+					if err != nil {
+						log.Printf("Error responding to interaction: %v", err)
+					}
+					return
+				}
+				content := ""
+				switch punsihedUsers[userID] {
+				case true:
+					content = fmt.Sprintf("%s already punished", member.Mention())
+					//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("%s already punished", member.Mention()))
+				default:
+					content = fmt.Sprintf("Punishing user %s", member.Mention())
+					//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("Punishing user %s", member.Mention()))
+					punsihedUsers[userID] = true
+				}
 				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
 					Data: &discordgo.InteractionResponseData{
-						Content: fmt.Sprintf("Only god can punish %s", member.Mention()),
+						Content: content,
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
 				}
-				return
-			}
-			content := ""
-			switch punsihedUsers[userID] {
-			case true:
-				content = fmt.Sprintf("%s already punished", member.Mention())
-				//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("%s already punished", member.Mention()))
-			default:
-				content = fmt.Sprintf("Punishing user %s", member.Mention())
-				//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("Punishing user %s", member.Mention()))
-				punsihedUsers[userID] = true
-			}
-			err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
-				Data: &discordgo.InteractionResponseData{
-					Content: content,
-				},
-			})
-			if err != nil {
-				s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-					Content: "Something went wrong",
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
 				})
-				return
+			} else {
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: "You are not allowed to use this command in this server",
+					},
+				})
+				if err != nil {
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
+				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
 			}
-			time.AfterFunc(time.Second*5, func() {
-				// delete the message after 5 seconds
-				s.InteractionResponseDelete(i.Interaction)
-			})
 		},
 		"absolve": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
-			member, err := s.GuildMember(i.GuildID, userID)
-			if err != nil {
-				log.Fatal(err)
-			}
+			if i.GuildID == "698693159261306921" {
+				userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
+				member, err := s.GuildMember(i.GuildID, userID)
+				if err != nil {
+					log.Printf("Error getting guild member: %v", err)
+				}
 
-			if member.User.Bot {
+				if member.User.Bot {
+					err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+						Data: &discordgo.InteractionResponseData{
+							Content: fmt.Sprintf("Only god can absolve %s", member.Mention()),
+						},
+					})
+					if err != nil {
+						log.Printf("Error responding to interaction: %v", err)
+					}
+					return
+				}
+				content := ""
+				switch punsihedUsers[userID] {
+				case true:
+					content = fmt.Sprintf("Absolving %s of sin", member.Mention())
+					delete(punsihedUsers, userID)
+				default:
+					content = fmt.Sprintf("%s already free of sin", member.Mention())
+
+				}
 				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
 					Data: &discordgo.InteractionResponseData{
-						Content: fmt.Sprintf("Only god can absolve %s", member.Mention()),
+						Content: content,
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
 				}
-				return
-			}
-			content := ""
-			switch punsihedUsers[userID] {
-			case true:
-				content = fmt.Sprintf("Absolving %s of sin", member.Mention())
-				delete(punsihedUsers, userID)
-			default:
-				content = fmt.Sprintf("%s already free of sin", member.Mention())
-
-			}
-			err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
-				Data: &discordgo.InteractionResponseData{
-					Content: content,
-				},
-			})
-			if err != nil {
-				s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-					Content: "Something went wrong",
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
 				})
-				return
+			} else {
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: "You are not allowed to use this command in this server",
+					},
+				})
+				if err != nil {
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
+				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
 			}
-			time.AfterFunc(time.Second*5, func() {
-				// delete the message after 5 seconds
-				s.InteractionResponseDelete(i.Interaction)
-			})
-			//s.ChannelMessageSend(i.ChannelID, fmt.Sprintf("Absolving user %s", member.Mention()))
-			//delete(punsihedUsers, userID)
 		},
 		"crissy": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if i.GuildID == "698693159261306921" {
 				member, err := s.GuildMember(i.GuildID, CHRIS_ID)
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("Error getting guild member: %v", err)
 				}
 				crissyContent := ""
 				switch crissyMode {
@@ -164,7 +234,7 @@ var (
 					},
 				})
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("Error responding to interaction: %v", err)
 				}
 				time.AfterFunc(time.Second*5, func() {
 					// delete the message after 5 seconds
@@ -192,9 +262,12 @@ var (
 	}
 )
 
+func getRandomPunishMessage() string {
+	return PUNISH_MESSAGES[rand.Intn(len(PUNISH_MESSAGES))]
+}
 func checkNilErr(e error) {
 	if e != nil {
-		log.Fatal("Error message")
+		log.Printf("Error:", e)
 	}
 }
 
@@ -235,14 +308,6 @@ func Run() {
 	<-c
 	if *RemoveCommands {
 		log.Println("Removing commands...")
-		// // We need to fetch the commands, since deleting requires the command ID.
-		// // We are doing this from the returned commands on line 375, because using
-		// // this will delete all the commands, which might not be desirable, so we
-		// // are deleting only the commands that we added.
-		// registeredCommands, err := s.ApplicationCommands(s.State.User.ID, *GuildID)
-		// if err != nil {
-		// 	log.Fatalf("Could not fetch registered commands: %v", err)
-		// }
 
 		for _, v := range registeredCommands {
 			err := discord.ApplicationCommandDelete(discord.State.User.ID, "", v.ID)
@@ -253,21 +318,28 @@ func Run() {
 	}
 }
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
-
-	/* prevent bot responding to its own message
-	this is achived by looking into the message author id
-	if message.author.id is same as bot.author.id then just return
-	*/
+	// Defensive nil checks - discordgo may pass nil when events fail to unmarshal (e.g. unknown component types)
+	if message == nil || message.Author == nil {
+		return
+	}
+	// DMs don't have GuildID - skip guild-only logic
+	if message.GuildID == "" {
+		return
+	}
+	// Prevent bot responding to its own message
 	if message.Author.ID == discord.State.User.ID {
 		return
 	}
-
 	if message.Author.Bot {
 		return
 	}
 	member, err := discord.GuildMember(message.GuildID, message.Author.ID)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error getting guild member: %v", err)
+		return
+	}
+	if member == nil {
+		return
 	}
 
 	if crissyMode {
@@ -277,21 +349,18 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			// if the message is from Chris, then punish him for 1 minute
 			err = discord.GuildMemberTimeout(message.GuildID, message.Author.ID, &oneMinute)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Error setting timeout: %v", err)
 			}
 			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
-
 		}
 	}
 
-	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case punsihedUsers[message.Author.ID]:
-		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s \nYou are punished!😡\n Bad kitten!🤪", member.Mention()))
+		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf(getRandomPunishMessage(), member.Mention()))
 		checkNilErr(err)
 		discord.ChannelMessageDelete(message.ChannelID, message.ID) // delete the message
 		time.Sleep(5 * time.Second)                                 // wait for 5 seconds
 		discord.ChannelMessageDelete(message.ChannelID, pun.ID)     // delete the punishment message
 	}
-
 }

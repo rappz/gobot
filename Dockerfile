@@ -1,6 +1,6 @@
 FROM golang:1.24.2-bookworm
 # Set the working directory
-WORKDIR /appdocke
+WORKDIR /appdocker
 # Copy the go.mod and go.sum files
 COPY . .
 # Download the dependencies
