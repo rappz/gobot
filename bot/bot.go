@@ -2,10 +2,13 @@
 package bot
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
@@ -51,6 +54,27 @@ var PUNISH_MESSAGES = []string{
 	"%s Come here, you chaotic rat kitten 🐀🐱\nDaddy is mad… but also holding you anyway.",
 }
 
+var KING_IMAGE = []string{
+	"https://media1.tenor.com/m/zzh5EGMb8KcAAAAd/yes-king.gif",
+	"https://media1.tenor.com/m/wzBvSvmdhdMAAAAd/yes-king-yes.gif",
+	"https://media1.tenor.com/m/1exE1H-iGGsAAAAd/martene3-yesking.gif",
+	"https://media1.tenor.com/m/psMStUrhCp4AAAAd/burger-king-yes-sir.gif",
+	"https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbm1zNGNwbTFtbjFvbXlmMzByY3p3azhmNzN3cDN5d2FhMjRrcTF0eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L0nhTaYf038ZqDMZpY/giphy.gif",
+}
+
+func getKingImage() (*bytes.Reader, error) {
+	resp, err := http.Get(KING_IMAGE[rand.Intn(len(KING_IMAGE))])
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return bytes.NewReader(body), err
+}
+
 // --- Slash command definitions and handlers ---
 
 var (
@@ -66,8 +90,8 @@ var (
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
-					Name:        "user-option",
-					Description: "User option",
+					Name:        "the-kitten",
+					Description: "The user to absolve of sin",
 					Required:    true,
 				},
 			},
@@ -79,8 +103,8 @@ var (
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
-					Name:        "user-option",
-					Description: "User option",
+					Name:        "the-kitten",
+					Description: "The user to punish for sin",
 					Required:    true,
 				},
 			},
@@ -204,10 +228,11 @@ var (
 					})
 					return
 				}
-				time.AfterFunc(time.Second*5, func() {
-					// delete the message after 5 seconds
-					s.InteractionResponseDelete(i.Interaction)
-				})
+				//time.AfterFunc(time.Second*5, func() {
+				// delete the message after 5 seconds
+				//	s.InteractionResponseDelete(i.Interaction)
+				//})
+
 			} else {
 				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
@@ -239,10 +264,12 @@ var (
 				switch crissyMode {
 				case true:
 					crissyContent = fmt.Sprintf("%s is now less of a sinner💦", member.Mention())
+					s.UpdateCustomStatus("Crissy Punisher is now off duty 💦")
 					crissyMode = false
 
 				case false:
 					crissyContent = fmt.Sprintf("%s will now get timed out for 1 minute if he @'s💦", member.Mention())
+					s.UpdateCustomStatus("Crissy Punisher is now set to punish 💦💦💦")
 					crissyMode = true
 				}
 				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -358,6 +385,9 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	if message == nil || message.Author == nil {
 		return
 	}
+	if message.Type == discordgo.MessageTypeReply {
+		return
+	}
 	if message.GuildID == "" {
 		return
 	}
@@ -386,17 +416,56 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 				log.Printf("Error setting timeout: %v", err)
 				return
 			}
+			userDM, err := discord.UserChannelCreate(message.Author.ID)
+			if err != nil {
+				log.Printf("Error creating user channel: %v", err)
+				return
+			}
+			kingImg, err := getKingImage()
+			if err != nil {
+				log.Printf("Error getting king image: %v", err)
+				discord.ChannelMessageSend(userDM.ID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
+			}
+			punishMsg := &discordgo.MessageSend{
+				Content: fmt.Sprintf(getRandomPunishMessage(), member.Mention()),
+				File:    &discordgo.File{Name: "king.gif", Reader: kingImg},
+			}
+			discord.ChannelMessageSendComplex(userDM.ID, punishMsg)
 			discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("%s get fucked pussy fart! ", member.Mention()))
 		}
+
 	}
 
 	// If author is punished: send random punish message, delete their message, then delete punish message after 5s.
-	switch {
-	case punsihedUsers[message.Author.ID]:
-		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf(getRandomPunishMessage(), member.Mention()))
-		checkNilErr(err)
-		discord.ChannelMessageDelete(message.ChannelID, message.ID)
-		time.Sleep(5 * time.Second)
-		discord.ChannelMessageDelete(message.ChannelID, pun.ID)
+	if punsihedUsers[message.Author.ID] {
+		kingImg, err := getKingImage()
+		if err != nil {
+			log.Printf("Error getting king image: %v", err)
+		} else {
+			punishMsg := &discordgo.MessageSend{
+				Content: fmt.Sprintf(getRandomPunishMessage(), member.Mention()),
+				File:    &discordgo.File{Name: "king.gif", Reader: kingImg},
+			}
+			_, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf(getRandomPunishMessage(), member.Mention()))
+			checkNilErr(err)
+			userDM, err := discord.UserChannelCreate(message.Author.ID)
+			checkNilErr(err)
+			discord.ChannelMessageSendComplex(userDM.ID, punishMsg)
+
+			err = discord.ChannelMessageDelete(message.ChannelID, message.ID)
+			if err != nil {
+				log.Printf("Failed to delete punished user message: channel=%s message=%s author=%s: %v", message.ChannelID, message.ID, message.Author.ID, err)
+			} else {
+				log.Printf("Deleted punished user message: channel=%s message=%s author=%s", message.ChannelID, message.ID, message.Author.ID)
+			}
+			/*
+				time.Sleep(5 * time.Second)
+				err = discord.ChannelMessageDelete(message.ChannelID, pun.ID)
+				if err != nil {
+					log.Printf("Failed to delete punishment reply: channel=%s message=%s: %v", message.ChannelID, pun.ID, err)
+				} else {
+					log.Printf("Deleted punishment reply: channel=%s message=%s", message.ChannelID, pun.ID)
+				}*/
+		}
 	}
 }
