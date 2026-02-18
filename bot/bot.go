@@ -1,3 +1,4 @@
+// Package bot implements a Discord bot with slash commands and message handlers.
 package bot
 
 import (
@@ -12,11 +13,15 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-const CHRIS_ID = "245751144209448961"     // Chris's ID
-var crissyMode = false                    // Crissy mode flag
-var BotToken string                       // Token for the bot, set in main.go
-var punsihedUsers = make(map[string]bool) // map to keep track of punished users
+// --- Constants and global state ---
+
+const CHRIS_ID = "245751144209448961"     // Chris's Discord user ID
+var crissyMode = false                    // When true, Chris gets timed out if he @-mentions someone
+var BotToken string                       // Discord bot token, set from main
+var punsihedUsers = make(map[string]bool) // User IDs currently "punished" (in-memory only)
 var defaultMemberPermissions = int64(discordgo.PermissionAdministrator)
+
+// PUNISH_MESSAGES are random messages sent when a punished user speaks; %s is replaced with their mention.
 var PUNISH_MESSAGES = []string{
 	"%sYou are punished!😡\n Bad kitten!🤪",
 	"%s Daddy is mad now 😤\nNaughty little kitten 🐾",
@@ -45,9 +50,14 @@ var PUNISH_MESSAGES = []string{
 	"%s One more zoomie and it's over 😤💨\nDaddy said calm.",
 	"%s Come here, you chaotic rat kitten 🐀🐱\nDaddy is mad… but also holding you anyway.",
 }
+
+// --- Slash command definitions and handlers ---
+
 var (
 	RemoveCommands = flag.Bool("rm-cmd", false, "Remove commands after execution")
 	//dmPermission   = false
+
+	// commands are registered with Discord as application (slash) commands.
 	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:                     "punish",
@@ -81,7 +91,10 @@ var (
 			DefaultMemberPermissions: &defaultMemberPermissions,
 		},
 	}
+
+	// commandHandlers dispatch slash command interactions; key is command name.
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		// punish: mark a user as "punished"; only in allowed guild.
 		"punish": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if i.GuildID == "698693159261306921" {
 				userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
@@ -148,6 +161,7 @@ var (
 				})
 			}
 		},
+		// absolve: remove a user from the punished set; only in allowed guild.
 		"absolve": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if i.GuildID == "698693159261306921" {
 				userID := i.ApplicationCommandData().Options[0].UserValue(nil).ID
@@ -213,6 +227,7 @@ var (
 				})
 			}
 		},
+		// crissy: toggle Crissy mode (timeout Chris on @-mention); only in allowed guild.
 		"crissy": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if i.GuildID == "698693159261306921" {
 				member, err := s.GuildMember(i.GuildID, CHRIS_ID)
@@ -266,35 +281,45 @@ var (
 	}
 )
 
+// --- Helpers ---
+
+// getRandomPunishMessage returns a random entry from PUNISH_MESSAGES.
 func getRandomPunishMessage() string {
 	return PUNISH_MESSAGES[rand.Intn(len(PUNISH_MESSAGES))]
 }
+
+// checkNilErr logs the error if non-nil (no panic).
 func checkNilErr(e error) {
 	if e != nil {
 		log.Print("Error: ", e)
 	}
 }
 
+// --- Main bot lifecycle ---
+
+// Run starts the Discord session, registers slash commands, and blocks until OS interrupt (e.g. Ctrl+C).
+// If -rm-cmd is set, slash commands are removed on shutdown.
 func Run() {
 	flag.Parse()
-	// create a session
+
 	discord, err := discordgo.New("Bot " + BotToken)
 	checkNilErr(err)
 
-	// add a event handler
 	discord.AddHandler(newMessage)
 	discord.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
 			h(s, i)
 		}
 	})
-	// open session
+
 	err = discord.Open()
 	if err != nil {
 		log.Printf("Cannot open the session: %v", err)
 		return
 	}
 	discord.UpdateCustomStatus("Daddy I'm Coming!")
+
+	// Register each slash command globally (empty guild ID = global).
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
 		cmd, err := discord.ApplicationCommandCreate(discord.State.User.ID, "", v)
@@ -305,16 +330,15 @@ func Run() {
 		registeredCommands[i] = cmd
 	}
 
-	defer discord.Close() // close session, after function termination
+	defer discord.Close()
 
-	// keep bot running untill there is NO os interruption (ctrl + C)
 	fmt.Println("Bot running....")
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
+
 	if *RemoveCommands {
 		log.Println("Removing commands...")
-
 		for _, v := range registeredCommands {
 			if v == nil {
 				continue
@@ -326,16 +350,17 @@ func Run() {
 		}
 	}
 }
+
+// --- Message handler ---
+// newMessage handles every message: applies Crissy mode (timeout Chris on @-mention) and
+// punishes already-marked users by deleting their message and posting a random punish message.
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
-	// Defensive nil checks - discordgo may pass nil when events fail to unmarshal (e.g. unknown component types)
 	if message == nil || message.Author == nil {
 		return
 	}
-	// DMs don't have GuildID - skip guild-only logic
 	if message.GuildID == "" {
 		return
 	}
-	// Prevent bot responding to its own message
 	if message.Author.ID == discord.State.User.ID {
 		return
 	}
@@ -351,11 +376,11 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		return
 	}
 
+	// Crissy mode: if Chris sends a message with mentions, timeout him 1 minute and reply.
 	if crissyMode {
 		if message.Author.ID == CHRIS_ID && len(message.Mentions) != 0 {
 			currentTime := time.Now()
 			oneMinute := currentTime.Add(time.Minute * 1)
-			// if the message is from Chris, then punish him for 1 minute
 			err = discord.GuildMemberTimeout(message.GuildID, message.Author.ID, &oneMinute)
 			if err != nil {
 				log.Printf("Error setting timeout: %v", err)
@@ -365,12 +390,13 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 	}
 
+	// If author is punished: send random punish message, delete their message, then delete punish message after 5s.
 	switch {
 	case punsihedUsers[message.Author.ID]:
 		pun, err := discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf(getRandomPunishMessage(), member.Mention()))
 		checkNilErr(err)
-		discord.ChannelMessageDelete(message.ChannelID, message.ID) // delete the message
-		time.Sleep(5 * time.Second)                                 // wait for 5 seconds
-		discord.ChannelMessageDelete(message.ChannelID, pun.ID)     // delete the punishment message
+		discord.ChannelMessageDelete(message.ChannelID, message.ID)
+		time.Sleep(5 * time.Second)
+		discord.ChannelMessageDelete(message.ChannelID, pun.ID)
 	}
 }
