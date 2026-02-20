@@ -86,6 +86,11 @@ var (
 			},
 		},
 		{
+			Name:                     "absolve-all",
+			Description:              "Absolve all kittens of sin",
+			DefaultMemberPermissions: &defaultMemberPermissions,
+		},
+		{
 			Name:                     "crissy",
 			Description:              "Toggle Crissy mode",
 			DefaultMemberPermissions: &defaultMemberPermissions,
@@ -209,6 +214,44 @@ var (
 				//	s.InteractionResponseDelete(i.Interaction)
 				//})
 
+			} else {
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: "You are not allowed to use this command in this server",
+					},
+				})
+				if err != nil {
+					s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+						Content: "Something went wrong",
+					})
+					return
+				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
+			}
+		},
+		"absolve-all": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			if i.GuildID == "698693159261306921" {
+				for userID := range punsihedUsers {
+					delete(punsihedUsers, userID)
+				}
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
+					Data: &discordgo.InteractionResponseData{
+						Content: "All users have been absolved",
+					},
+				})
+				if err != nil {
+					log.Printf("Error responding to interaction: %v", err)
+					return
+				}
+				time.AfterFunc(time.Second*5, func() {
+					// delete the message after 5 seconds
+					s.InteractionResponseDelete(i.Interaction)
+				})
 			} else {
 				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseType(discordgo.InteractionResponseChannelMessageWithSource),
